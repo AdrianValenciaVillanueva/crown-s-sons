@@ -1,25 +1,41 @@
-# lexer.py
-# Lexer simple para C++ usando expresiones regulares
-# Devuelto: lista de tokens con tipo, valor y span (start,end)
-
-import re
+import re, sys
 from dataclasses import dataclass
 from typing import List, Tuple
 
+#Clase para representar un token con su tipo, valor y posición en el texto
 @dataclass
 class Token:
     type: str
     value: str
     span: Tuple[int, int]
 
-# Lista de palabras clave (pueden ampliarse)
+#Lista de Keywords de C++ para reconocer en el lexer
 KEYWORDS = [
     "if", "else", "while", "for", "class", "int", "float", "double",
     "return", "break", "continue", "char", "bool", "void", "public",
-    "private", "protected", "virtual", "static", "const", "new", "delete"
+    "private", "protected", "virtual", "static", "const", "new", "delete",
+    "using", "namespace", "std", "cout", "endl", "cin" 
 ]
 
-# Construir el patrón combinado con grupos con nombre. El orden importa.
+# Diccionario para mapear los grupos del Regex a los nombres de Tokens finales
+TOKEN_TYPE_MAP = {
+    'BLOCK_COMMENT': 'COMMENT',
+    'LINE_COMMENT':  'COMMENT',
+    'INT':           'NUMBER',
+    'FLOAT':         'NUMBER',
+    'STRING':        'STRING',
+    'KEYWORD':       'KEYWORD',
+    'IDENTIFIER':    'IDENTIFIER',
+    'LOGICAL':       'OPERATOR',
+    'SHIFT_OP':      'OPERATOR',
+    'RELATIONAL':    'OPERATOR',
+    'ASSIGN':        'OPERATOR',  
+    'ARITH':         'OPERATOR',
+    'SCOPE':         'OPERATOR',
+    'SYMBOL':        'SYMBOL',
+    'OTHER':         'OTHER'
+}
+
 TOKEN_REGEX = (
     r'(?P<BLOCK_COMMENT>/\*[\s\S]*?\*/)|'
     r'(?P<LINE_COMMENT>//.*)|'
@@ -31,56 +47,31 @@ TOKEN_REGEX = (
     r'(?P<LOGICAL>&&|\|\||!)|'
     r'(?P<SCOPE>::)|'
     r'(?P<SHIFT_OP><<|>>)|'
-    r'(?P<RELATIONAL><=|>=|==|!=|<|>)|'
-    r'(?P<ARITH>\+|\-|\*|/)|'
-    r'(?P<SYMBOL>[\(\)\[\]\{\},;\.])|'
+    r'(?P<RELATIONAL><=|>=|==|!=|<|>)|'  
+    r'(?P<ASSIGN>=)|'                     
+    r'(?P<ARITH>\+|\-|\*|/|%)|'          
+    r'(?P<SYMBOL>[\(\)\[\]\{\},;\.#])|'  
     r'(?P<WHITESPACE>\s+)|'
     r'(?P<OTHER>.)'
 )
 
 _COMPILED = re.compile(TOKEN_REGEX)
 
-
 def tokenize(text: str) -> List[Token]:
-    """Tokeniza el texto y devuelve lista de Token(type, value, (start,end)).
-    Los tokens incluyen comentarios, cadenas, números, palabras clave, identificadores,
-    operadores y símbolos.
-    """
     tokens: List[Token] = []
+    
     for m in _COMPILED.finditer(text):
-        t = m.lastgroup
-        v = m.group(t)
-        start = m.start()
-        end = m.end()
-        if t == 'WHITESPACE':
+        kind = m.lastgroup
+        value = m.group(kind)
+        start, end = m.span()
+        
+        if kind == 'WHITESPACE':
             continue
-        if t == 'OTHER':
-            # Ignorar, o clasificar como OTHER
-            tokens.append(Token('OTHER', v, (start, end)))
-        else:
-            # Normalizar los tipos para usarlos en el resaltador
-            typ = t
-            if typ == 'KEYWORD':
-                typ = 'KEYWORD'
-            elif typ in ('INT', 'FLOAT'):
-                typ = 'NUMBER'
-            elif typ == 'ARITH':
-                typ = 'OPERATOR'
-            elif typ == 'RELATIONAL':
-                typ = 'OPERATOR'
-            elif typ == 'LOGICAL':
-                typ = 'OPERATOR'
-            elif typ in ('SHIFT_OP', 'SCOPE'):
-                typ = 'OPERATOR'
-            elif typ in ('LINE_COMMENT', 'BLOCK_COMMENT'):
-                typ = 'COMMENT'
-            elif typ == 'STRING':
-                typ = 'STRING'
-            elif typ == 'IDENTIFIER':
-                typ = 'IDENTIFIER'
-            elif typ == 'SYMBOL':
-                typ = 'SYMBOL'
-            else:
-                typ = typ
-            tokens.append(Token(typ, v, (start, end)))
+            
+        #Se obtiene el nombre final del token usando el diccionario
+        #Si no está en el diccionario, usamos el nombre del grupo original
+        final_type = TOKEN_TYPE_MAP.get(kind, kind)
+        
+        tokens.append(Token(final_type, value, (start, end)))
+        
     return tokens

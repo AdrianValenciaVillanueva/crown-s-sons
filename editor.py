@@ -1,156 +1,154 @@
 import os
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
-
 import customtkinter as ctk
-import lexer
+import lexer 
 
+# Configuración visual (opcional)
+ctk.set_appearance_mode("Dark")  
+ctk.set_default_color_theme("blue")
 
 class SimpleEditor(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title('Simple Editor')
-        self.geometry('900x600')
+        self.title('Compilador C++ - Analizador Léxico')
+        self.geometry('1000x700')
         self._file_path = None
 
-        # Main frames
-        self.grid_rowconfigure(0, weight=1)
+        # Configuración de la rejilla principal
+        self.grid_rowconfigure(0, weight=3) # El editor ocupa más espacio
+        self.grid_rowconfigure(1, weight=1) # La consola ocupa menos
         self.grid_columnconfigure(0, weight=1)
 
-        # Text widget for code (use native Text inside a CTkFrame)
-        frame = ctk.CTkFrame(self)
-        frame.grid(row=0, column=0, sticky='nsew', padx=8, pady=8)
-        frame.grid_rowconfigure(0, weight=1)
-        frame.grid_columnconfigure(0, weight=1)
+        # --- ÁREA DE CÓDIGO (EDITOR) ---
+        # Usamos CTkTextbox que ya trae scrollbar y estilos modernos
+        self.text = ctk.CTkTextbox(self, wrap='none', font=("Consolas", 14), undo=True)
+        self.text.grid(row=0, column=0, sticky='nsew', padx=10, pady=(10, 5))
 
+        # --- ÁREA DE SALIDA (TOKENS) ---
+        self.output = ctk.CTkTextbox(self, height=150, wrap='word', font=("Consolas", 12))
+        self.output.grid(row=1, column=0, sticky='nsew', padx=10, pady=(5, 10))
+        
+        #Color de fondo diferente para diferenciar la consola (simulado)
+        self.output.configure(fg_color="#1e1e1e", text_color="#00ff00") # Texto verde tipo hacker
+        self.output.insert("0.0", "--- Esperando análisis (Presiona Ctrl+T) ---\n")
+        self.output.configure(state="disabled") # Bloqueamos escritura manual en la consola
+
+        #Menu Superior
         import tkinter as tk
-
-        self.text = tk.Text(frame, wrap='none', undo=True)
-        self.text.grid(row=0, column=0, sticky='nsew')
-
-        #terminal
-        # Output area: muestra tokens del lexer
-        self.output = tk.Text(frame, height=10, wrap='word', bg='#111111', fg='#dcdcdc')
-        self.output.grid(row=1, column=0, sticky='nsew', pady=(8, 0))
-
-        # Asegúrate de que el frame tenga dos filas configuradas para que el editor y la salida se redimensionen
-        frame.grid_rowconfigure(0, weight=3)   # editor (texto)
-        frame.grid_rowconfigure(1, weight=1)   # salida (tokens)
-        # Menubar (tk menu works with CTk)
         menubar = tk.Menu(self)
+        
+        #Menú Archivo
         file_menu = tk.Menu(menubar, tearoff=0)
-        file_menu.add_command(label='New', command=self.new_file, accelerator='Ctrl+N')
-        file_menu.add_command(label='Open...', command=self.open_file, accelerator='Ctrl+O')
-        file_menu.add_command(label='Save', command=self.save_file, accelerator='Ctrl+S')
-        file_menu.add_command(label='Save As...', command=self.save_file_as)
-        menubar.add_cascade(label='File', menu=file_menu)
+        file_menu.add_command(label='Nuevo', command=self.new_file, accelerator='Ctrl+N')
+        file_menu.add_command(label='Abrir...', command=self.open_file, accelerator='Ctrl+O')
+        file_menu.add_command(label='Guardar', command=self.save_file, accelerator='Ctrl+S')
+        file_menu.add_command(label='Guardar Como...', command=self.save_file_as)
+        file_menu.add_separator()
+        file_menu.add_command(label='Salir', command=self.quit)
+        menubar.add_cascade(label='Archivo', menu=file_menu)
 
-        # Run menu present but disabled while Run feature is under development
+        #Menú Compilar
         run_menu = tk.Menu(menubar, tearoff=0)
-        run_menu.add_command(label='Run', command=self.run_stub, accelerator='F5', state='disabled')
-        menubar.add_cascade(label='Run', menu=run_menu)
-
-        # Atajo de teclado
-        self.bind_all('<Control-t>', lambda e: self.analyze_syntax())
+        run_menu.add_command(label='Analizar Lexer', command=self.analyze_syntax, accelerator='Ctrl+T')
+        menubar.add_cascade(label='Compilar', menu=run_menu)
 
         self.config(menu=menubar)
 
-        # Bindings
-        self.bind_all('<Control-n>', lambda e: self.new_file())
-        self.bind_all('<Control-o>', lambda e: self.open_file())
-        self.bind_all('<Control-s>', lambda e: self.save_file())
+        #Atajos de teclado
+        self.bind('<Control-n>', lambda e: self.new_file())
+        self.bind('<Control-o>', lambda e: self.open_file())
+        self.bind('<Control-s>', lambda e: self.save_file())
+        self.bind('<Control-t>', lambda e: self.analyze_syntax())
 
     def _append_output(self, text: str):
-        """Append a line to the output panel."""
-        # Crear la salida si por alguna razón no existe
-        if not hasattr(self, 'output') or self.output is None:
-            return
+        self.output.configure(state="normal") # Habilitar para escribir
         self.output.insert('end', text + '\n')
-        self.output.see('end')
+        self.output.see('end') # Auto-scroll al final
+        self.output.configure(state="disabled") # Volver a bloquear
 
     def analyze_syntax(self):
-        """Tokeniza el buffer actual usando lexer.tokenize y muestra los tokens en la salida."""
-        # Limpia la salida
-        if hasattr(self, 'output'):
-            self.output.delete('1.0', 'end')
+        """Tokeniza el código y muestra resultados."""
+        # Limpiar consola
+        self.output.configure(state="normal")
+        self.output.delete('0.0', 'end')
+        self.output.configure(state="disabled")
 
-        code = self.text.get('1.0', 'end')
+        # Obtener texto del editor
+        code = self.text.get('0.0', 'end')
+        
         try:
             tokens = lexer.tokenize(code)
+            
+            self._append_output(f"{'TIPO':<15} {'VALOR':<25} {'POSICIÓN'}")
+            self._append_output("-" * 60)
+            
             if not tokens:
-                self._append_output('No tokens produced')
+                self._append_output('No se encontraron tokens.')
                 return
+            
             for t in tokens:
-                # t tiene .type, .value, .span
-                typ = getattr(t, 'type', '?')
-                val = getattr(t, 'value', '')
-                span = getattr(t, 'span', None)
-                self._append_output(f"{typ:10} {repr(val):30} {span}")
+                #Como definimos la dataclass en lexer, podemos acceder directo a los atributos
+                val_str = repr(t.value)
+                #Recortar si el valor es muy largo para que no rompa la tabla visual
+                if len(val_str) > 22: val_str = val_str[:22] + "..."
+                
+                self._append_output(f"{t.type:<15} {val_str:<25} {t.span}")
+                
         except Exception as e:
-            self._append_output(f'Lexer error: {e}')
+            self._append_output(f'Error Fatal: {e}')
 
     def new_file(self):
         if self._maybe_save():
-            self.text.delete('1.0', 'end')
+            self.text.delete('0.0', 'end')
             self._file_path = None
-            self.title('Simple Editor - Untitled')
+            self.title('Compilador C++ - Sin Título')
 
     def open_file(self):
         if not self._maybe_save():
             return
-        path = fd.askopenfilename(filetypes=[('Python', '*.py'), ('All files', '*.*')])
+        #Filtro para archivos C++ y todos los archivos
+        path = fd.askopenfilename(filetypes=[('C++ Source', '*.cpp *.h'), ('Todos', '*.*')])
         if path:
             try:
                 with open(path, 'r', encoding='utf-8') as f:
                     data = f.read()
-                self.text.delete('1.0', 'end')
-                self.text.insert('1.0', data)
+                self.text.delete('0.0', 'end')
+                self.text.insert('0.0', data)
                 self._file_path = path
-                self.title(f'Simple Editor - {os.path.basename(path)}')
+                self.title(f'Compilador C++ - {os.path.basename(path)}')
             except Exception as e:
-                mb.showerror('Open file', str(e))
+                mb.showerror('Error', str(e))
 
     def save_file(self):
         if self._file_path:
             try:
                 with open(self._file_path, 'w', encoding='utf-8') as f:
-                    f.write(self.text.get('1.0', 'end'))
+                    f.write(self.text.get('0.0', 'end'))
             except Exception as e:
-                mb.showerror('Save file', str(e))
+                mb.showerror('Error', str(e))
         else:
             self.save_file_as()
 
     def save_file_as(self):
-        path = fd.asksaveasfilename(defaultextension='.py', filetypes=[('Python', '*.py'), ('All files', '*.*')])
+        # CORREGIDO: Extensión por defecto .cpp
+        path = fd.asksaveasfilename(defaultextension='.cpp', 
+                                  filetypes=[('C++ Source', '*.cpp *.h'), ('Todos', '*.*')])
         if path:
             try:
                 with open(path, 'w', encoding='utf-8') as f:
-                    f.write(self.text.get('1.0', 'end'))
+                    f.write(self.text.get('0.0', 'end'))
                 self._file_path = path
-                self.title(f'Simple Editor - {os.path.basename(path)}')
+                self.title(f'Compilador C++ - {os.path.basename(path)}')
             except Exception as e:
-                mb.showerror('Save file', str(e))
-
-    def run_stub(self):
-        # Run is intentionally disabled while C/C++ support is being developed.
-        # This method is a no-op placeholder so the menu entry can exist.
-        return
+                mb.showerror('Error', str(e))
 
     def _maybe_save(self):
-        if self.text.edit_modified():
-            resp = mb.askyesnocancel('Save', 'Save changes?')
-            if resp is None:
-                return False
-            if resp:
-                self.save_file()
-        return True
-    
-
+        return True 
 
 def main():
     app = SimpleEditor()
     app.mainloop()
-
 
 if __name__ == '__main__':
     main()
