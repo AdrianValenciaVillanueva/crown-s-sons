@@ -4,10 +4,6 @@ import tkinter.messagebox as mb
 import customtkinter as ctk
 import lexer 
 
-# Configuración visual (opcional)
-ctk.set_appearance_mode("Dark")  
-ctk.set_default_color_theme("blue")
-
 class SimpleEditor(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -15,30 +11,32 @@ class SimpleEditor(ctk.CTk):
         self.geometry('1000x700')
         self._file_path = None
 
-        # Configuración de la rejilla principal
-        self.grid_rowconfigure(0, weight=3) # El editor ocupa más espacio
-        self.grid_rowconfigure(1, weight=1) # La consola ocupa menos
+        # Configuración de la rejilla
+        self.grid_rowconfigure(0, weight=3)
+        self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        # --- ÁREA DE CÓDIGO (EDITOR) ---
-        # Usamos CTkTextbox que ya trae scrollbar y estilos modernos
+        # --- ÁREA DE CÓDIGO ---
         self.text = ctk.CTkTextbox(self, wrap='none', font=("Consolas", 14), undo=True)
         self.text.grid(row=0, column=0, sticky='nsew', padx=10, pady=(10, 5))
 
-        # --- ÁREA DE SALIDA (TOKENS) ---
+        # TERMINAL
         self.output = ctk.CTkTextbox(self, height=150, wrap='word', font=("Consolas", 12))
         self.output.grid(row=1, column=0, sticky='nsew', padx=10, pady=(5, 10))
         
-        #Color de fondo diferente para diferenciar la consola (simulado)
-        self.output.configure(fg_color="#1e1e1e", text_color="#00ff00") # Texto verde tipo hacker
+        # Estilos de la consola
+        self.output.configure(fg_color="#1e1e1e", text_color="#00ff00") 
+        
+        # Configuramos un "tag" llamado 'error_style' con color rojo para los errores
+        self.output.tag_config("error_style", foreground="#FF5555") 
+        
         self.output.insert("0.0", "--- Esperando análisis (Presiona Ctrl+T) ---\n")
-        self.output.configure(state="disabled") # Bloqueamos escritura manual en la consola
+        self.output.configure(state="disabled")
 
-        #Menu Superior
+        # MENÚ SUPERIOR 
         import tkinter as tk
         menubar = tk.Menu(self)
         
-        #Menú Archivo
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label='Nuevo', command=self.new_file, accelerator='Ctrl+N')
         file_menu.add_command(label='Abrir...', command=self.open_file, accelerator='Ctrl+O')
@@ -48,56 +46,74 @@ class SimpleEditor(ctk.CTk):
         file_menu.add_command(label='Salir', command=self.quit)
         menubar.add_cascade(label='Archivo', menu=file_menu)
 
-        #Menú Compilar
         run_menu = tk.Menu(menubar, tearoff=0)
         run_menu.add_command(label='Analizar Lexer', command=self.analyze_syntax, accelerator='Ctrl+T')
         menubar.add_cascade(label='Compilar', menu=run_menu)
 
         self.config(menu=menubar)
 
-        #Atajos de teclado
+        # Atajos
         self.bind('<Control-n>', lambda e: self.new_file())
         self.bind('<Control-o>', lambda e: self.open_file())
         self.bind('<Control-s>', lambda e: self.save_file())
         self.bind('<Control-t>', lambda e: self.analyze_syntax())
 
-    def _append_output(self, text: str):
-        self.output.configure(state="normal") # Habilitar para escribir
-        self.output.insert('end', text + '\n')
-        self.output.see('end') # Auto-scroll al final
-        self.output.configure(state="disabled") # Volver a bloquear
+    def _append_output(self, text: str, tags=None):
+        """Función auxiliar para escribir en la consola con o sin tags."""
+        self.output.configure(state="normal")
+       
+        self.output.insert('end', text + '\n', tags)
+        self.output.see('end')
+        self.output.configure(state="disabled")
 
     def analyze_syntax(self):
-        """Tokeniza el código y muestra resultados."""
-        # Limpiar consola
+        """Tokeniza el código y muestra resultados coloreados."""
         self.output.configure(state="normal")
         self.output.delete('0.0', 'end')
         self.output.configure(state="disabled")
 
-        # Obtener texto del editor
         code = self.text.get('0.0', 'end')
         
         try:
             tokens = lexer.tokenize(code)
             
-            self._append_output(f"{'TIPO':<15} {'VALOR':<25} {'POSICIÓN'}")
-            self._append_output("-" * 60)
+            # Encabezado
+            header = f"{'LÍN:COL':<10} | {'TIPO':<15} | {'VALOR':<25} | {'DESC/ERROR'}"
+            self._append_output(header)
+            self._append_output("-" * 85)
             
             if not tokens:
                 self._append_output('No se encontraron tokens.')
                 return
             
+            error_count = 0
+
             for t in tokens:
-                #Como definimos la dataclass en lexer, podemos acceder directo a los atributos
+                pos_str = f"{t.line}:{t.column}"
                 val_str = repr(t.value)
-                #Recortar si el valor es muy largo para que no rompa la tabla visual
                 if len(val_str) > 22: val_str = val_str[:22] + "..."
                 
-                self._append_output(f"{t.type:<15} {val_str:<25} {t.span}")
-                
-        except Exception as e:
-            self._append_output(f'Error Fatal: {e}')
+                if t.type == 'ERROR':
+                    error_count += 1
+                    row_str = f"{pos_str:<10} | {'ERROR':<15} | {val_str:<25} | {t.error}"
+                    # Llamamos a append pasando el tag "error_style"
+                    self._append_output(row_str, "error_style")
+                else:
+                    row_str = f"{pos_str:<10} | {t.type:<15} | {val_str:<25} |"
+                    self._append_output(row_str)
+            
+            self._append_output("-" * 85)
+            
+            # Resumen final
+            if error_count > 0:
+                self._append_output(f"\n[!] SE ENCONTRARON {error_count} ERRORES LÉXICOS.", "error_style")
+            else:
+                self._append_output(f"\n[OK] ARRE CERO ERRORES.")
 
+        except Exception as e:
+            self._append_output(f'Error Fatal: {e}', "error_style")
+
+    # --- MÉTODOS DE ARCHIVO (Igual que antes, sin cambios) ---
     def new_file(self):
         if self._maybe_save():
             self.text.delete('0.0', 'end')
@@ -105,9 +121,7 @@ class SimpleEditor(ctk.CTk):
             self.title('Compilador C++ - Sin Título')
 
     def open_file(self):
-        if not self._maybe_save():
-            return
-        #Filtro para archivos C++ y todos los archivos
+        if not self._maybe_save(): return
         path = fd.askopenfilename(filetypes=[('C++ Source', '*.cpp *.h'), ('Todos', '*.*')])
         if path:
             try:
@@ -131,9 +145,7 @@ class SimpleEditor(ctk.CTk):
             self.save_file_as()
 
     def save_file_as(self):
-        # CORREGIDO: Extensión por defecto .cpp
-        path = fd.asksaveasfilename(defaultextension='.cpp', 
-                                  filetypes=[('C++ Source', '*.cpp *.h'), ('Todos', '*.*')])
+        path = fd.asksaveasfilename(defaultextension='.cpp', filetypes=[('C++ Source', '*.cpp *.h'), ('Todos', '*.*')])
         if path:
             try:
                 with open(path, 'w', encoding='utf-8') as f:
@@ -144,7 +156,7 @@ class SimpleEditor(ctk.CTk):
                 mb.showerror('Error', str(e))
 
     def _maybe_save(self):
-        return True 
+        return True
 
 def main():
     app = SimpleEditor()
