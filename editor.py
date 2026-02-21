@@ -118,7 +118,7 @@ class SimpleEditor(ctk.CTk):
         pass
 
     def analyze_syntax(self):
-        """NUEVA FUNCIÓN: Llama al parser_cpp y muestra errores gramaticales."""
+        """NUEVA FUNCIÓN: Llama al parser.py y muestra errores gramaticales."""
         
         self.output.configure(state="normal")
         self.output.delete('0.0', 'end')

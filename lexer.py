@@ -7,9 +7,9 @@ class Token:
     type: str
     value: str
     span: Tuple[int, int]
-    line: int       # Nueva: Número de línea
-    column: int     # Nueva: Número de columna
-    error: str = None # Nueva: Si hay error, aquí va la descripción
+    line: int       # Número de línea
+    column: int     # Número de columna
+    error: str = None # Si hay error, aquí va la descripción
 
 KEYWORDS = [
     "if", "else", "while", "for", "class", "int", "float", "double",
@@ -36,8 +36,7 @@ TOKEN_TYPE_MAP = {
     'WHITESPACE':    'WHITESPACE'
 }
 
-# ERRORES LÉXICOS (Agregados para la práctica)
-# Nota: El orden importa. Ponemos las reglas de error antes o en lugares estratégicos.
+#Se agregaron errores lexicos al regex
 TOKEN_REGEX = (
     r'(?P<BLOCK_COMMENT>/\*[\s\S]*?\*/)|'
     r'(?P<LINE_COMMENT>//.*)|'
