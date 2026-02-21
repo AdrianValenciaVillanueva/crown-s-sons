@@ -2,7 +2,8 @@ import os
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
 import customtkinter as ctk
-import lexer 
+import lexer
+import parser 
 
 class SimpleEditor(ctk.CTk):
     def __init__(self):
@@ -47,7 +48,8 @@ class SimpleEditor(ctk.CTk):
         menubar.add_cascade(label='Archivo', menu=file_menu)
 
         run_menu = tk.Menu(menubar, tearoff=0)
-        run_menu.add_command(label='Analizar Lexer', command=self.analyze_syntax, accelerator='Ctrl+T')
+        run_menu.add_command(label='Analizar Léxico', command=self.analyze_lexical, accelerator='Ctrl+L')
+        run_menu.add_command(label='Analizar Sintaxis', command=self.analyze_syntax, accelerator='Ctrl+T')
         menubar.add_cascade(label='Compilar', menu=run_menu)
 
         self.config(menu=menubar)
@@ -56,6 +58,7 @@ class SimpleEditor(ctk.CTk):
         self.bind('<Control-n>', lambda e: self.new_file())
         self.bind('<Control-o>', lambda e: self.open_file())
         self.bind('<Control-s>', lambda e: self.save_file())
+        self.bind('<Control-l>', lambda e: self.analyze_lexical())
         self.bind('<Control-t>', lambda e: self.analyze_syntax())
 
     def _append_output(self, text: str, tags=None):
@@ -66,7 +69,7 @@ class SimpleEditor(ctk.CTk):
         self.output.see('end')
         self.output.configure(state="disabled")
 
-    def analyze_syntax(self):
+    def analyze_lexical(self):
         """Tokeniza el código y muestra resultados coloreados."""
         self.output.configure(state="normal")
         self.output.delete('0.0', 'end')
@@ -109,6 +112,37 @@ class SimpleEditor(ctk.CTk):
                 self._append_output(f"\n[!] SE ENCONTRARON {error_count} ERRORES LÉXICOS.", "error_style")
             else:
                 self._append_output(f"\n[OK] ARRE CERO ERRORES.")
+
+        except Exception as e:
+            self._append_output(f'Error Fatal: {e}', "error_style")
+        pass
+
+    def analyze_syntax(self):
+        """NUEVA FUNCIÓN: Llama al parser_cpp y muestra errores gramaticales."""
+        
+        self.output.configure(state="normal")
+        self.output.delete('0.0', 'end')
+        self.output.configure(state="disabled")
+
+        code = self.text.get('0.0', 'end')
+        
+        try:
+            # 1. Primero sacamos los tokens
+            tokens = lexer.tokenize(code)
+            
+            # 2. Se los pasamos al Parser
+            syntax_errors = parser.parse(tokens)
+            
+            self._append_output("=== RESULTADOS DEL ANÁLISIS SINTÁCTICO ===")
+            self._append_output("-" * 85)
+            
+            if not syntax_errors:
+                self._append_output("\n[OK] ARRE COMPA, CERO ERRORES SINTÁCTICOS.")
+            else:
+                for error in syntax_errors:
+                    self._append_output(error, "error_style")
+                
+                self._append_output(f"\n[!] SE ENCONTRARON {len(syntax_errors)} ERRORES SINTÁCTICOS.", "error_style")
 
         except Exception as e:
             self._append_output(f'Error Fatal: {e}', "error_style")
