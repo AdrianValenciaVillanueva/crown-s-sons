@@ -24,6 +24,7 @@ TOKEN_TYPE_MAP = {
     'INT':           'NUMBER',
     'FLOAT':         'NUMBER',
     'STRING':        'STRING',
+    'CHAR_LITERAL':  'CHAR_LITERAL',
     'KEYWORD':       'KEYWORD',
     'IDENTIFIER':    'IDENTIFIER',
     'LOGICAL':       'OPERATOR',
@@ -36,7 +37,7 @@ TOKEN_TYPE_MAP = {
     'WHITESPACE':    'WHITESPACE'
 }
 
-#Se agregaron errores lexicos al regex
+# Se agregaron errores lexicos al regex
 TOKEN_REGEX = (
     r'(?P<BLOCK_COMMENT>/\*[\s\S]*?\*/)|'
     r'(?P<LINE_COMMENT>//.*)|'
@@ -44,6 +45,9 @@ TOKEN_REGEX = (
     # 1. Cadenas mal formadas (no cierran comillas antes de nueva línea o fin de archivo)
     r'(?P<ERR_STRING_OPEN>"[^"]*(\n|$))|' 
     r'(?P<STRING>"([^"\\]|\\.)*")|'
+
+    # --- Atrapamos TODO lo que esté entre comillas simples ---
+    r"(?P<CHAR_LITERAL>'[^']*')|"
     
     # 2. Literales numéricos incorrectos (ej: 12.34.56)
     r'(?P<ERR_FLOAT_BAD>\d+\.\d+\.\d+)|' 
@@ -80,16 +84,14 @@ def tokenize(text: str) -> List[Token]:
         start, end = m.span()
         
         # Calcular Línea y Columna
-        # line: cuenta los saltos de línea hasta el inicio del token (+1 porque empezamos en 1)
         line = text.count('\n', 0, start) + 1
-        # col: posición actual menos la posición del último salto de línea
         last_newline = text.rfind('\n', 0, start)
-        column = start - last_newline # (Si es -1, se vuelve start + 1)
+        column = start - last_newline
 
         if kind == 'WHITESPACE':
             continue
             
-        # --- MANEJO DE ERRORES ---
+        # --- MANEJO DE ERRORES LÉXICOS ---
         if kind == 'ERR_STRING_OPEN':
             tokens.append(Token('ERROR', value, (start, end), line, column, "Cadena no cerrada (Falta comilla de cierre)"))
         elif kind == 'ERR_FLOAT_BAD':
@@ -99,6 +101,14 @@ def tokenize(text: str) -> List[Token]:
         elif kind == 'ERR_UNKNOWN':
              tokens.append(Token('ERROR', value, (start, end), line, column, "Carácter no reconocido"))
         else:
+            # --- VALIDACIÓN MANUAL DE CHAR ---
+            if kind == 'CHAR_LITERAL':
+                # Validamos la longitud: un char normal son 3 caracteres (ej: 'z')
+                # Un salto de línea o escape son 4 caracteres (ej: '\n')
+                if len(value) > 4 or len(value) < 3:
+                    tokens.append(Token('ERROR', value, (start, end), line, column, "Literal de carácter mal formado (debe ser exactamente un carácter)"))
+                    continue  # Brincamos la creación del token válido
+            
             # Token Válido
             final_type = TOKEN_TYPE_MAP.get(kind, kind)
             tokens.append(Token(final_type, value, (start, end), line, column))

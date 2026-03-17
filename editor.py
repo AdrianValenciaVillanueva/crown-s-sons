@@ -118,8 +118,7 @@ class SimpleEditor(ctk.CTk):
         pass
 
     def analyze_syntax(self):
-        """NUEVA FUNCIÓN: Llama al parser.py y muestra errores gramaticales."""
-        
+        """Llama al parser.py y muestra errores gramaticales y semánticos."""
         self.output.configure(state="normal")
         self.output.delete('0.0', 'end')
         self.output.configure(state="disabled")
@@ -127,22 +126,31 @@ class SimpleEditor(ctk.CTk):
         code = self.text.get('0.0', 'end')
         
         try:
-            # 1. Primero sacamos los tokens
             tokens = lexer.tokenize(code)
+            # El parser ahora devuelve DOS valores
+            syntax_errors, semantic_errors = parser.parse(tokens)
             
-            # 2. Se los pasamos al Parser
-            syntax_errors = parser.parse(tokens)
-            
+            # --- IMPRIMIR SINTÁXIS ---
             self._append_output("=== RESULTADOS DEL ANÁLISIS SINTÁCTICO ===")
             self._append_output("-" * 85)
             
             if not syntax_errors:
-                self._append_output("\n[OK] ARRE COMPA, CERO ERRORES SINTÁCTICOS.")
+                self._append_output("[OK] ARRE COMPA, CERO ERRORES SINTÁCTICOS.\n")
             else:
                 for error in syntax_errors:
                     self._append_output(error, "error_style")
-                
-                self._append_output(f"\n[!] SE ENCONTRARON {len(syntax_errors)} ERRORES SINTÁCTICOS.", "error_style")
+                self._append_output(f"[!] SE ENCONTRARON {len(syntax_errors)} ERRORES SINTÁCTICOS.\n", "error_style")
+
+            # --- IMPRIMIR SEMÁNTICA ---
+            self._append_output("=== RESULTADOS DEL ANÁLISIS SEMÁNTICO (TABLA DE SÍMBOLOS) ===")
+            self._append_output("-" * 85)
+            
+            if not semantic_errors:
+                self._append_output("[OK] TODO CHIDO, CERO ERRORES SEMÁNTICOS.\n")
+            else:
+                for error in semantic_errors:
+                    self._append_output(error, "error_style")
+                self._append_output(f"\n[!] SE ENCONTRARON {len(semantic_errors)} ERRORES SEMÁNTICOS.\n", "error_style")
 
         except Exception as e:
             self._append_output(f'Error Fatal: {e}', "error_style")
