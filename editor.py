@@ -4,6 +4,7 @@ import tkinter.messagebox as mb
 import customtkinter as ctk
 import lexer
 import parser 
+import Semantic
 
 class SimpleEditor(ctk.CTk):
     def __init__(self):
@@ -50,6 +51,7 @@ class SimpleEditor(ctk.CTk):
         run_menu = tk.Menu(menubar, tearoff=0)
         run_menu.add_command(label='Analizar Léxico', command=self.analyze_lexical, accelerator='Ctrl+L')
         run_menu.add_command(label='Analizar Sintaxis', command=self.analyze_syntax, accelerator='Ctrl+T')
+        run_menu.add_command(label='Analizar Semántica', command=self.analyze_semantic, accelerator='Ctrl+M')
         menubar.add_cascade(label='Compilar', menu=run_menu)
 
         self.config(menu=menubar)
@@ -60,6 +62,7 @@ class SimpleEditor(ctk.CTk):
         self.bind('<Control-s>', lambda e: self.save_file())
         self.bind('<Control-l>', lambda e: self.analyze_lexical())
         self.bind('<Control-t>', lambda e: self.analyze_syntax())
+        self.bind('<Control-m>', lambda e: self.analyze_semantic())
 
     def _append_output(self, text: str, tags=None):
         """Función auxiliar para escribir en la consola con o sin tags."""
@@ -118,7 +121,8 @@ class SimpleEditor(ctk.CTk):
         pass
 
     def analyze_syntax(self):
-        """Llama al parser.py y muestra errores gramaticales y semánticos."""
+        """NUEVA FUNCIÓN: Llama al parser.py y muestra errores gramaticales."""
+        
         self.output.configure(state="normal")
         self.output.delete('0.0', 'end')
         self.output.configure(state="disabled")
@@ -126,34 +130,66 @@ class SimpleEditor(ctk.CTk):
         code = self.text.get('0.0', 'end')
         
         try:
+            # 1. Primero sacamos los tokens
             tokens = lexer.tokenize(code)
-            # El parser ahora devuelve DOS valores
-            syntax_errors, semantic_errors = parser.parse(tokens)
             
-            # --- IMPRIMIR SINTÁXIS ---
+            # 2. Se los pasamos al Parser
+            syntax_errors = parser.parse(tokens)
+            
             self._append_output("=== RESULTADOS DEL ANÁLISIS SINTÁCTICO ===")
             self._append_output("-" * 85)
             
             if not syntax_errors:
-                self._append_output("[OK] ARRE COMPA, CERO ERRORES SINTÁCTICOS.\n")
+                self._append_output("\n[OK] ARRE COMPA, CERO ERRORES SINTÁCTICOS.")
             else:
                 for error in syntax_errors:
                     self._append_output(error, "error_style")
-                self._append_output(f"[!] SE ENCONTRARON {len(syntax_errors)} ERRORES SINTÁCTICOS.\n", "error_style")
-
-            # --- IMPRIMIR SEMÁNTICA ---
-            self._append_output("=== RESULTADOS DEL ANÁLISIS SEMÁNTICO (TABLA DE SÍMBOLOS) ===")
-            self._append_output("-" * 85)
-            
-            if not semantic_errors:
-                self._append_output("[OK] TODO CHIDO, CERO ERRORES SEMÁNTICOS.\n")
-            else:
-                for error in semantic_errors:
-                    self._append_output(error, "error_style")
-                self._append_output(f"\n[!] SE ENCONTRARON {len(semantic_errors)} ERRORES SEMÁNTICOS.\n", "error_style")
+                
+                self._append_output(f"\n[!] SE ENCONTRARON {len(syntax_errors)} ERRORES SINTÁCTICOS.", "error_style")
 
         except Exception as e:
             self._append_output(f'Error Fatal: {e}', "error_style")
+            
+    def analyze_semantic(self):
+     """Analiza la semántica: tipos de datos, alcances y variables no declaradas."""
+     self.output.configure(state="normal")
+     self.output.delete('0.0', 'end')
+     self.output.configure(state="disabled")
+
+     code = self.text.get('0.0', 'end')
+
+     try:
+         # 1. Obtener tokens
+         tokens = lexer.tokenize(code)
+
+         # 2. Pasarlos al Analizador Semántico
+         analyzer = Semantic.SemanticAnalyzer(tokens)
+         sem_errors, sym_table = analyzer.analyze()
+
+         self._append_output("=== RESULTADOS DEL ANÁLISIS SEMÁNTICO ===")
+         self._append_output("-" * 85)
+
+         # Imprimir Errores
+         if not sem_errors:
+             self._append_output("\n[OK] ARRE COMPA, CERO ERRORES SEMÁNTICOS.")
+         else:
+             for error in sem_errors:
+                 self._append_output(error, "error_style")
+             self._append_output(f"\n[!] SE ENCONTRARON {len(sem_errors)} ERRORES SEMÁNTICOS.", "error_style")
+
+         # Imprimir Tabla de Símbolos
+         self._append_output("\n" + "=" * 30 + " TABLA DE SÍMBOLOS " + "=" * 30)
+         self._append_output(f"{'IDENTIFICADOR':<20} | {'TIPO':<15} | {'ALCANCE'}")
+         self._append_output("-" * 85)
+
+         if not sym_table.all_symbols:
+             self._append_output("La tabla de símbolos está vacía.")
+         else:
+             for name, data in sym_table.all_symbols.items():
+                 self._append_output(f"{name:<20} | {data['tipo']:<15} | {data['alcance']}")
+
+     except Exception as e:
+         self._append_output(f'Error Fatal: {e}', "error_style")
 
     # --- MÉTODOS DE ARCHIVO (Igual que antes, sin cambios) ---
     def new_file(self):
