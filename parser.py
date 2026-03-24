@@ -50,6 +50,8 @@ class Parser:
             return self.parse_while()
         elif t.value == 'for':
             return self.parse_for()
+        elif t.value == 'return':              
+            return self.parse_return()
         elif t.value == '{':
             return self.parse_block()
         elif t.value in self.valid_types or t.value in self.invalid_types:
@@ -65,6 +67,21 @@ class Parser:
             return self.parse_assignment_or_expr()
 
     # --- CLASES Y MÉTODOS ---
+    def parse_return(self):
+        t_ret = self.consume() # Consume 'return'
+        
+        # Si no es un punto y coma inmediato, debe haber una expresión
+        if self.peek() and self.peek().value != ';':
+            if not self.parse_logical_expr():
+                return False
+                
+        if not self.peek() or self.peek().value != ';':
+            self.add_error(f"Error Sintáctico: Se esperaba ';' después de 'return' en la línea {t_ret.line}.", t_ret.line)
+            return False
+            
+        self.consume() # Consume ';'
+        return True
+
     def parse_class_declaration(self):
         t_class = self.consume() # Consume 'class'
         
@@ -332,7 +349,22 @@ class Parser:
     def parse_factor(self):
         t = self.peek()
         if not t: return False
-        if t.type in ('IDENTIFIER', 'NUMBER', 'STRING'): # Agregué STRING por si lo usas
+        
+        if t.type == 'IDENTIFIER':
+            self.consume()
+            # Verificar si es una llamada a función ej. miMetodo(x, y)
+            if self.peek() and self.peek().value == '(':
+                self.consume() # Consume '('
+                while self.peek() and self.peek().value != ')':
+                    self.parse_logical_expr()
+                    if self.peek() and self.peek().value == ',':
+                        self.consume()
+                if self.peek() and self.peek().value == ')':
+                    self.consume()
+                else:
+                    self.add_error(f"Error Sintáctico: Falta ')' en la llamada al método en la línea {t.line}.", t.line)
+            return True
+        elif t.type in ('NUMBER', 'STRING', 'CHAR_LITERAL'): 
             self.consume()
             return True
         elif t.value == '(':
@@ -343,7 +375,7 @@ class Parser:
                 self.consume()
                 return res
             else:
-                self.add_error(f"Error: Paréntesis desbalanceados en la línea {open_paren.line}, columna {open_paren.column}.", open_paren.line)
+                self.add_error(f"Error: Paréntesis desbalanceados en la línea {open_paren.line}.", open_paren.line)
                 return False
         return False
 
