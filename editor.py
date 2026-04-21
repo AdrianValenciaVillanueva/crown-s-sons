@@ -5,6 +5,7 @@ import customtkinter as ctk
 import lexer
 import parser 
 import Semantic
+import icg
 
 class SimpleEditor(ctk.CTk):
     def __init__(self):
@@ -52,6 +53,8 @@ class SimpleEditor(ctk.CTk):
         run_menu.add_command(label='Analizar Léxico', command=self.analyze_lexical, accelerator='Ctrl+L')
         run_menu.add_command(label='Analizar Sintaxis', command=self.analyze_syntax, accelerator='Ctrl+T')
         run_menu.add_command(label='Analizar Semántica', command=self.analyze_semantic, accelerator='Ctrl+M')
+        # --- NUEVO BOTÓN ---
+        run_menu.add_command(label='Código Intermedio', command=self.generate_icg, accelerator='Ctrl+I')
         menubar.add_cascade(label='Compilar', menu=run_menu)
 
         self.config(menu=menubar)
@@ -63,6 +66,7 @@ class SimpleEditor(ctk.CTk):
         self.bind('<Control-l>', lambda e: self.analyze_lexical())
         self.bind('<Control-t>', lambda e: self.analyze_syntax())
         self.bind('<Control-m>', lambda e: self.analyze_semantic())
+        self.bind('<Control-i>', lambda e: self.generate_icg())  # <-- NUEVO ATAJO
 
     def _append_output(self, text: str, tags=None):
         """Función auxiliar para escribir en la consola con o sin tags."""
@@ -235,6 +239,37 @@ class SimpleEditor(ctk.CTk):
 
     def _maybe_save(self):
         return True
+
+    def generate_icg(self):
+        """Genera el Código Intermedio de 3 Direcciones."""
+        self.output.configure(state="normal")
+        self.output.delete('0.0', 'end')
+        self.output.configure(state="disabled")
+
+        code = self.text.get('0.0', 'end')
+
+        try:
+            tokens = lexer.tokenize(code)
+            
+            # Instanciamos la nueva clase de código intermedio
+            generator = icg.ICG(tokens)
+            tac_code = generator.generate()
+
+            self._append_output("=== CÓDIGO INTERMEDIO (3 DIRECCIONES) ===")
+            self._append_output("-" * 85)
+
+            if not tac_code:
+                self._append_output("No se encontraron asignaciones para generar código intermedio.")
+            else:
+                for line in tac_code:
+                    # Imprime cada etiqueta temporal y validación
+                    self._append_output(line)
+                    
+            self._append_output("-" * 85)
+            self._append_output("\n[OK] GENERACIÓN COMPLETADA.")
+
+        except Exception as e:
+            self._append_output(f'Error Fatal: {e}', "error_style")    
 
 def main():
     app = SimpleEditor()
