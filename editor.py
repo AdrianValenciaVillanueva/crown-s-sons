@@ -241,35 +241,31 @@ class SimpleEditor(ctk.CTk):
         return True
 
     def generate_icg(self):
-        """Genera el Código Intermedio de 3 Direcciones."""
         self.output.configure(state="normal")
         self.output.delete('0.0', 'end')
-        self.output.configure(state="disabled")
-
+        
         code = self.text.get('0.0', 'end')
-
         try:
             tokens = lexer.tokenize(code)
-            
-            # Instanciamos la nueva clase de código intermedio
             generator = icg.ICG(tokens)
             tac_code = generator.generate()
 
-            self._append_output("=== CÓDIGO INTERMEDIO (3 DIRECCIONES) ===")
-            self._append_output("-" * 85)
+            self._append_output("=== CÓDIGO INTERMEDIO (CONTROL DE FLUJO) ===")
+            self._append_output("-" * 50)
 
-            if not tac_code:
-                self._append_output("No se encontraron asignaciones para generar código intermedio.")
-            else:
-                for line in tac_code:
-                    # Imprime cada etiqueta temporal y validación
+            for line in tac_code:
+                if line.endswith(':'): # Es una etiqueta
                     self._append_output(line)
+                else: # Es una instrucción, le damos sangría
+                    self._append_output(f"    {line}")
                     
-            self._append_output("-" * 85)
-            self._append_output("\n[OK] GENERACIÓN COMPLETADA.")
+            self._append_output("-" * 50)
+            self._append_output("\n[OK] Generación de TAC completada.")
 
         except Exception as e:
-            self._append_output(f'Error Fatal: {e}', "error_style")    
+            self._append_output(f"Error en ICG: {str(e)}")
+        
+        self.output.configure(state="disabled")
 
 def main():
     app = SimpleEditor()

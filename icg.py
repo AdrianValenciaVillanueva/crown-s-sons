@@ -2,127 +2,308 @@ import lexer
 
 class ICG:
     def __init__(self, tokens):
+        # Filtramos espacios y comentarios
         self.tokens = [t for t in tokens if t.type not in ('WHITESPACE', 'COMMENT')]
         self.pos = 0
         self.temp_count = 1
+        self.label_count = 1
         self.code = []
 
     def new_temp(self):
-        """Genera una nueva etiqueta temporal (t1, t2, t3...)."""
         t = f"t{self.temp_count}"
         self.temp_count += 1
         return t
 
+    def new_label(self):
+        l = f"L{self.label_count}"
+        self.label_count += 1
+        return l
+
     def add_instruction(self, instr):
         self.code.append(instr)
-
-    def generate(self):
-        """Busca asignaciones y genera código intermedio para ellas."""
-        while self.pos < len(self.tokens):
-            t = self.tokens[self.pos]
-
-            # Detectar declaración con asignación (ej. int x = ...) o asignación simple (ej. x = ...)
-            is_simple_assign = (t.type == 'IDENTIFIER' and self.peek(1) and self.peek(1).value == '=')
-            is_decl_assign = (t.value in ["int", "float", "double", "char", "bool", "string"] and 
-                              self.peek(1) and self.peek(1).type == 'IDENTIFIER' and 
-                              self.peek(2) and self.peek(2).value == '=')
-
-            if is_simple_assign or is_decl_assign:
-                if t.type == 'IDENTIFIER':
-                    target_var = t.value
-                    self.pos += 2 # Saltar nombre y '='
-                else:
-                    target_var = self.peek(1).value
-                    self.pos += 3 # Saltar tipo, nombre y '='
-                
-                expr_tokens = []
-                while self.pos < len(self.tokens) and self.tokens[self.pos].value not in (';', ','):
-                    expr_tokens.append(self.tokens[self.pos])
-                    self.pos += 1
-                
-                if expr_tokens:
-                    self.process_expression(target_var, expr_tokens)
-                
-                if self.pos < len(self.tokens) and self.tokens[self.pos].value in (';', ','):
-                    self.pos += 1
-                continue
-            
-            self.pos += 1
-            
-        return self.code
 
     def peek(self, offset=0):
         if self.pos + offset < len(self.tokens):
             return self.tokens[self.pos + offset]
         return None
 
-    def process_expression(self, target, expr_tokens):
-        # Jerarquía de operaciones para el algoritmo Shunting Yard
-        precedence = {
-            '||': 1, '&&': 2,
-            '==': 3, '!=': 3, '>': 3, '<': 3, '>=': 3, '<=': 3,
-            '+': 4, '-': 4,
-            '*': 5, '/': 5, '%': 5
-        }
-        
-       # 1. Validaciones y Errores (División por cero y tipos) solicitados en la rúbrica
-        for i, tok in enumerate(expr_tokens):
-            if tok.value == '/' and i + 1 < len(expr_tokens):
-                # NUEVO: Solo validar si el divisor directo es una variable o un número, ignorando paréntesis
-                if expr_tokens[i+1].type in ('IDENTIFIER', 'NUMBER'):
-                    divisor = expr_tokens[i+1].value
-                    self.add_instruction(f'if {divisor} == 0 then error "Division by zero"')
+    def consume(self):
+        t = self.peek()
+        self.pos += 1
+        return t
 
-            if tok.value in ('+', '-', '*', '/'):
-                left_tok = expr_tokens[i-1] if i > 0 else None
-                right_tok = expr_tokens[i+1] if i+1 < len(expr_tokens) else None
-                if left_tok and right_tok:
-                    if left_tok.type == 'STRING' or right_tok.type == 'STRING':
-                        self.add_instruction(f'if type({left_tok.value}) != integer or type({right_tok.value}) != integer then error "Type mismatch"')
+    def generate(self):
+        """Punto de entrada principal"""
+        while self.pos < len(self.tokens):
+            self.process_statement()
+        return self.code
 
-        # 2. Convertir a Notación Polaca Inversa (Postfijo)
-        output = []
-        stack = []
-        
-        for tok in expr_tokens:
-            if tok.type in ('NUMBER', 'IDENTIFIER', 'STRING', 'CHAR_LITERAL') or tok.value in ('true', 'false'):
-                output.append(tok.value)
-            elif tok.value == '(':
-                stack.append(tok.value)
-            elif tok.value == ')':
-                while stack and stack[-1] != '(':
-                    output.append(stack.pop())
-                if stack:
-                    stack.pop() # Quitar '('
-            elif tok.value in precedence:
-                while stack and stack[-1] != '(' and precedence.get(stack[-1], 0) >= precedence[tok.value]:
-                    output.append(stack.pop())
-                stack.append(tok.value)
-        
-        while stack:
-            output.append(stack.pop())
+    def process_statement(self):
+        t = self.peek()
+        if not t: return
+
+        # --- ESTRUCTURA IF / ELSE ---
+        if t.value == "if":
+            self.consume() # consume 'if'
+            self.consume() # consume '('
+            cond_temp = self.process_expression(stop_at=[')'])
+            self.consume() # consume ')'
             
-        # 3. Generar el Código de 3 Direcciones
-        eval_stack = []
-        for item in output:
-            if item in precedence:
-                if len(eval_stack) >= 2:
-                    right_val, right_is_temp = eval_stack.pop()
-                    left_val, left_is_temp = eval_stack.pop()
-                    temp = self.new_temp()
-                    self.add_instruction(f"{temp} = {left_val} {item} {right_val}")
-                    eval_stack.append((temp, True)) # Es un temporal
-            else:
-                eval_stack.append((item, False)) # Es un valor o variable directa
+            label_else = self.new_label()
+            label_end = self.new_label()
+            
+            self.add_instruction(f"if not {cond_temp} goto {label_else}")
+            
+            # Bloque IF (Verdadero)
+            self.process_block_or_statement()
+            self.add_instruction(f"goto {label_end}")
+            
+            # Bloque ELSE (Falso)
+            self.add_instruction(f"{label_else}:")
+            if self.peek() and self.peek().value == "else":
+                self.consume() # consume 'else'
+                self.process_block_or_statement()
                 
-        # 4. Asignación final a la variable objetivo
-        if len(eval_stack) == 1:
-            final_val, is_temp = eval_stack.pop()
-            if not is_temp:
-                # Si es asignación directa (ej. x = 5), se manda a un temporal primero como pide la rúbrica
-                temp = self.new_temp()
-                self.add_instruction(f"{temp} = {final_val}")
-                self.add_instruction(f"{target} = {temp}")
+            self.add_instruction(f"{label_end}:")
+
+        # --- ESTRUCTURA SWITCH ---
+        elif t.value == "switch":
+            self.consume() # 'switch'
+            self.consume() # '('
+            switch_temp = self.process_expression(stop_at=[')'])
+            self.consume() # ')'
+            self.consume() # '{'
+            
+            # 1. Escaneo rápido para encontrar casos y organizar los saltos (Jump Table)
+            saved_pos = self.pos
+            case_values = []
+            has_default = False
+            
+            while self.peek() and self.peek().value != '}':
+                if self.peek().value == 'case':
+                    self.pos += 1
+                    case_values.append(self.consume().value)
+                elif self.peek().value == 'default':
+                    has_default = True
+                    self.pos += 1
+                else:
+                    self.pos += 1
+                    
+            self.pos = saved_pos # Regresamos a la posición original
+            
+            case_labels = {val: self.new_label() for val in case_values}
+            default_label = self.new_label() if has_default else self.new_label()
+            end_label = self.new_label()
+            
+            # 2. Imprimir las validaciones de saltos primero (Como pide la rúbrica)
+            for val in case_values:
+                self.add_instruction(f"if {switch_temp} == {val} goto {case_labels[val]}")
+            self.add_instruction(f"goto {default_label}")
+            
+            # 3. Imprimir el cuerpo de cada caso
+            while self.peek() and self.peek().value != '}':
+                tok = self.consume()
+                if tok.value == 'case':
+                    val = self.consume().value
+                    self.consume() # ':'
+                    self.add_instruction(f"{case_labels[val]}:")
+                elif tok.value == 'default':
+                    self.consume() # ':'
+                    self.add_instruction(f"{default_label}:")
+                elif tok.value == 'break':
+                    if self.peek() and self.peek().value == ';':
+                        self.consume() # ';'
+                    self.add_instruction(f"goto {end_label}")
+                else:
+                    self.pos -= 1
+                    self.process_statement()
+                    
+            self.consume() # '}'
+            if not has_default:
+                self.add_instruction(f"{default_label}:")
+            self.add_instruction(f"{end_label}:")
+
+        # --- ESTRUCTURA DO-WHILE ---
+        elif t.value == "do":
+            self.consume() # 'do'
+            l_start = self.new_label()
+            
+            self.add_instruction(f"{l_start}:")
+            self.process_block_or_statement()
+            
+            if self.peek() and self.peek().value == "while":
+                self.consume() # 'while'
+                self.consume() # '('
+                cond = self.process_expression(stop_at=[')'])
+                self.consume() # ')'
+                if self.peek() and self.peek().value == ';':
+                    self.consume() # ';'
+                self.add_instruction(f"if {cond} goto {l_start}")
+
+        # --- ESTRUCTURA RETURN ---
+        elif t.value == "return":
+            self.consume() # 'return'
+            ret_expr = self.process_expression(stop_at=[';'])
+            if self.peek() and self.peek().value == ';': 
+                self.consume()
+            self.add_instruction(f"return {ret_expr}")
+
+        # --- ESTRUCTURA WHILE ---
+        elif t.value == "while":
+            self.consume()
+            l_start = self.new_label()
+            l_end = self.new_label()
+            
+            self.add_instruction(f"{l_start}:")
+            self.consume() # '('
+            cond = self.process_expression(stop_at=[')'])
+            self.consume() # ')'
+            
+            self.add_instruction(f"if not {cond} goto {l_end}")
+            self.process_block_or_statement()
+            self.add_instruction(f"goto {l_start}")
+            self.add_instruction(f"{l_end}:")
+
+        # --- ESTRUCTURA FOR ---
+        elif t.value == "for":
+            self.consume() # 'for'
+            self.consume() # '('
+            self.process_statement() # Inicialización
+            
+            l_start = self.new_label()
+            l_end = self.new_label()
+            
+            self.add_instruction(f"{l_start}:")
+            cond = self.process_expression(stop_at=[';'])
+            self.consume() # ';'
+            
+            self.add_instruction(f"if not {cond} goto {l_end}")
+            
+            inc_tokens = []
+            while self.peek() and self.peek().value != ')':
+                inc_tokens.append(self.consume())
+            self.consume() # ')'
+            
+            self.process_block_or_statement()
+            
+            if inc_tokens:
+                # TAC simplificado para el incremento
+                self.add_instruction(f"{inc_tokens[0].value} = {inc_tokens[0].value} + 1")
+                
+            self.add_instruction(f"goto {l_start}")
+            self.add_instruction(f"{l_end}:")
+
+        # --- CLASES ---
+        elif t.value == "class":
+            self.consume() # 'class'
+            class_name = self.consume().value
+            self.add_instruction(f"# Definición de la clase {class_name}")
+            self.consume() # '{'
+            while self.peek() and self.peek().value != '}':
+                self.process_statement()
+            self.consume() # '}'
+
+        # --- MÉTODOS / FUNCIONES ---
+        elif t.type == 'KEYWORD' and self.peek(2) and self.peek(2).value == '(':
+            self.consume() # tipo retorno
+            name = self.consume()
+            l_func = self.new_label()
+            self.add_instruction(f"# Definición del método {name.value}")
+            self.add_instruction(f"{l_func}:")
+            while self.peek() and self.peek().value != ')': self.consume()
+            self.consume() # ')'
+            self.process_block_or_statement()
+
+        # --- ASIGNACIONES / LLAMADAS A OBJETOS ---
+        elif t.type == 'IDENTIFIER' or t.value in ["int", "float", "bool", "string"]:
+            target = None
+            
+            # 1. Determinar quién es el objetivo (Ej. 'int x', 'Persona p' o solo 'x')
+            if t.value in ["int", "float", "bool", "string"]: 
+                self.consume() # Tipo
+                target = self.consume().value
             else:
-                # Si ya viene de temporales (ej. total = t10)
-                self.add_instruction(f"{target} = {final_val}")
+                if self.peek(1) and self.peek(1).type == 'IDENTIFIER':
+                    self.consume() # Nombre de clase (Ej. Persona)
+                    target = self.consume().value
+                else:
+                    target = self.consume().value
+
+            # 2. Es llamada a método de un objeto? (Ej. p.celebrarCumpleaños())
+            if self.peek() and self.peek().value == '.':
+                self.consume() # '.'
+                method_name = self.consume().value
+                self.consume() # '('
+                while self.peek() and self.peek().value != ')': self.consume()
+                self.consume() # ')'
+                if self.peek() and self.peek().value == ';': self.consume()
+                self.add_instruction(f"call {method_name}")
+
+            # 3. Asignación convencional (=)
+            elif self.peek() and self.peek().value == "=":
+                self.consume() # '='
+                
+                # Creación de objetos (new Persona())
+                if self.peek() and self.peek().value == "new":
+                    self.consume() # 'new'
+                    class_name = self.consume().value
+                    self.consume() # '('
+                    self.consume() # ')'
+                    if self.peek() and self.peek().value == ';': self.consume()
+                    self.add_instruction(f"obj = create {class_name}") 
+                
+                # Llamada a método que retorna valor (result = suma(5, 3))
+                elif self.peek() and self.peek().type == 'IDENTIFIER' and self.peek(1) and self.peek(1).value == '(':
+                    method_name = self.consume().value
+                    self.consume() # '('
+                    
+                    args = []
+                    while self.peek() and self.peek().value != ')':
+                        if self.peek().value != ',':
+                            args.append(self.consume().value)
+                        else:
+                            self.consume()
+                    self.consume() # ')'
+                    
+                    # Temporales para los parámetros
+                    for arg in args:
+                        t_param = self.new_temp()
+                        self.add_instruction(f"{t_param} = {arg}")
+                        
+                    self.add_instruction(f"call {method_name}")
+                    self.add_instruction(f"{target} = return_value")
+                    if self.peek() and self.peek().value == ';': self.consume()
+                    
+                # Expresión matemática normal
+                else:
+                    expr_res = self.process_expression(stop_at=[';'])
+                    if self.peek() and self.peek().value == ';': self.consume()
+                    self.add_instruction(f"{target} = {expr_res}")
+            else:
+                pass # Evita atorarse
+        else:
+            self.consume()
+
+    def process_block_or_statement(self):
+        if self.peek() and self.peek().value == "{":
+            self.consume() # '{'
+            while self.peek() and self.peek().value != "}":
+                self.process_statement()
+            self.consume() # '}'
+        else:
+            self.process_statement()
+
+    def process_expression(self, stop_at=[]):
+        tokens_to_process = []
+        while self.peek() and self.peek().value not in stop_at and self.peek().value != ';':
+            tokens_to_process.append(self.consume())
+        
+        if not tokens_to_process: return "0"
+        
+        if len(tokens_to_process) == 1:
+            return tokens_to_process[0].value
+
+        t = self.new_temp()
+        expr_str = " ".join([tok.value for tok in tokens_to_process])
+        self.add_instruction(f"{t} = {expr_str}")
+        return t
