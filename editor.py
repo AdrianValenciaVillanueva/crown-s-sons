@@ -7,6 +7,7 @@ import parser
 import Semantic
 import icg
 import optimizer
+import codegen
 
 class SimpleEditor(ctk.CTk):
     def __init__(self):
@@ -68,6 +69,7 @@ class SimpleEditor(ctk.CTk):
         self.bind('<Control-t>', lambda e: self.analyze_syntax())
         self.bind('<Control-m>', lambda e: self.analyze_semantic())
         self.bind('<Control-i>', lambda e: self.generate_icg())  # <-- NUEVO ATAJO
+        self.bind('<Control-g>', lambda e: self.generate_machine_code())  # <-- NUEVO ATAJO
 
     def _append_output(self, text: str, tags=None):
         """Función auxiliar para escribir en la consola con o sin tags."""
@@ -274,6 +276,48 @@ class SimpleEditor(ctk.CTk):
 
         except Exception as e:
             self._append_output(f"Error en ICG/Optimizer: {str(e)}")
+        
+        self.output.configure(state="disabled")
+    
+    def generate_machine_code(self):
+        self.output.configure(state="normal")
+        self.output.delete('0.0', 'end')
+        
+        code = self.text.get('0.0', 'end')
+        try:
+            # 1. Pipeline anterior (Tokens -> ICG -> Optimizer)
+            tokens = lexer.tokenize(code)
+            tac_code = icg.ICG(tokens).generate()
+            optimized_code = optimizer.Optimizer(tac_code).optimize()
+
+            # 2. Generación de Código Máquina
+            generator = codegen.CodeGenerator(optimized_code)
+            machine_code, sym_table = generator.generate()
+
+            # --- IMPRESIÓN SECCIÓN 1: CÓDIGO MÁQUINA ---
+            self._append_output("=== CÓDIGO MÁQUINA (ENSAMBLADOR) ===")
+            for line in machine_code:
+                self._append_output(line)
+                
+            # --- IMPRESIÓN SECCIÓN 2: TABLA DE SÍMBOLOS ---
+            self._append_output("\n=== TABLA DE SÍMBOLOS (MEMORIA) ===")
+            self._append_output(f"{'Símbolo':<15} | {'Dirección':<10}")
+            self._append_output("-" * 30)
+            for sym, addr in sym_table.items():
+                self._append_output(f"{sym:<15} | {addr:<10}")
+
+            # --- IMPRESIÓN SECCIÓN 3: ARCHIVO EJECUTABLE ---
+            self._append_output("\n" + generator.generate_executable_header())
+
+            # Guardar el binario físicamente (Extra para el entorno real)
+            if self._file_path:
+                bin_path = self._file_path.replace('.cpp', '.bin')
+                with open(bin_path, 'w') as f:
+                    f.write(generator.generate_executable_header())
+                self._append_output(f"\n[OK] Archivo físico guardado en: {bin_path}")
+
+        except Exception as e:
+            self._append_output(f"Error en Generación: {str(e)}")
         
         self.output.configure(state="disabled")
 

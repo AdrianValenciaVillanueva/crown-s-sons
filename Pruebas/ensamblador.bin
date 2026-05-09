@@ -1,0 +1,11 @@
+=== ARCHIVO EJECUTABLE GENERADO (programa.bin) ===
+[HEADER] MAGIC: 0x7F454C46 (Formato ELF)
+[HEADER] ENTRY_POINT: 0x1000
+[ENV] PERMISOS: +x (Ejecución permitida)
+[ENV] LIBRERÍAS: std_math.dll cargada
+--------------------------------------------------
+0x1000  AF 2B 00 2C ... (Instrucción Máquina)
+0x1004  AF 2B 00 2C ... (Instrucción Máquina)
+0x1008  AF 2B 00 2C ... (Instrucción Máquina)
+0x100C  AF 2B 00 2C ... (Instrucción Máquina)
+0x1010  AF 2B 00 2C ... (Instrucción Máquina)
