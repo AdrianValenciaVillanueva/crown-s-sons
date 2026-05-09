@@ -6,6 +6,7 @@ import lexer
 import parser 
 import Semantic
 import icg
+import optimizer
 
 class SimpleEditor(ctk.CTk):
     def __init__(self):
@@ -250,20 +251,29 @@ class SimpleEditor(ctk.CTk):
             generator = icg.ICG(tokens)
             tac_code = generator.generate()
 
-            self._append_output("=== CÓDIGO INTERMEDIO (CONTROL DE FLUJO) ===")
-            self._append_output("-" * 50)
-
+            # --- CÓDIGO ORIGINAL ---
+            self._append_output("=== CÓDIGO INTERMEDIO ORIGINAL ===")
             for line in tac_code:
-                if line.endswith(':'): # Es una etiqueta
+                if line.endswith(':'): 
                     self._append_output(line)
-                else: # Es una instrucción, le damos sangría
+                else: 
                     self._append_output(f"    {line}")
                     
-            self._append_output("-" * 50)
-            self._append_output("\n[OK] Generación de TAC completada.")
+            # --- CÓDIGO OPTIMIZADO ---
+            opt = optimizer.Optimizer(tac_code)
+            optimized_code = opt.optimize()
+
+            self._append_output("\n=== CÓDIGO OPTIMIZADO (SIN CÓDIGO MUERTO) ===")
+            for line in optimized_code:
+                if line.endswith(':'): 
+                    self._append_output(line)
+                else: 
+                    self._append_output(f"    {line}")
+                    
+            self._append_output("\n[OK] Optimización completada.")
 
         except Exception as e:
-            self._append_output(f"Error en ICG: {str(e)}")
+            self._append_output(f"Error en ICG/Optimizer: {str(e)}")
         
         self.output.configure(state="disabled")
 
