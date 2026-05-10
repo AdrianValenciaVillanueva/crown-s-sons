@@ -213,6 +213,19 @@ class ICG:
             while self.peek() and self.peek().value != ')': self.consume()
             self.consume() # ')'
             self.process_block_or_statement()
+            
+        elif t.value == "goto":
+            self.consume() # Consume 'goto'
+            target_label = self.consume().value # Lee 'L2'
+            if self.peek() and self.peek().value == ';': 
+                self.consume() # Consume el ';'
+            self.add_instruction(f"goto {target_label}")
+
+        # --- ETIQUETAS MANUALES (Ej. L2:) ---
+        elif t.type == 'IDENTIFIER' and self.peek(1) and self.peek(1).value == ':':
+            label_name = self.consume().value # Lee el nombre (L2)
+            self.consume() # Consume los dos puntos ':'
+            self.add_instruction(f"{label_name}:")
 
         # --- ASIGNACIONES / LLAMADAS A OBJETOS ---
         elif t.type == 'IDENTIFIER' or t.value in ["int", "float", "bool", "string"]:

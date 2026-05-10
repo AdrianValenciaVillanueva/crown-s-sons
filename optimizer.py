@@ -13,20 +13,22 @@ class Optimizer:
         return code
 
     def remove_unreachable_code(self, code):
-        """Elimina instrucciones después de un 'goto' hasta encontrar la siguiente etiqueta."""
+        """Elimina instrucciones después de un 'goto' o 'return' hasta encontrar la siguiente etiqueta."""
         optimized = []
         is_dead = False
+        
         for line in code:
-            # Si encontramos una etiqueta, el código vuelve a ser alcanzable
-            if line.strip().endswith(':'):
+            stripped_line = line.strip()
+            
+            if stripped_line.endswith(':'):
                 is_dead = False
             
             if not is_dead:
                 optimized.append(line)
             
-            # Si es un salto incondicional, lo que siga es código muerto
-            if line.strip().startswith('goto '):
+            if stripped_line.startswith('goto ') or stripped_line.startswith('return ') or stripped_line == 'return':
                 is_dead = True
+                
         return optimized
 
     def eliminate_redundant_assignments(self, code):
