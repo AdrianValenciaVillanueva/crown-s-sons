@@ -21,7 +21,6 @@ class SimpleEditor(ctk.CTk):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        # --- ÁREA DE CÓDIGO ---
         self.text = ctk.CTkTextbox(self, wrap='none', font=("Consolas", 14), undo=True)
         self.text.grid(row=0, column=0, sticky='nsew', padx=10, pady=(10, 5))
 
@@ -187,7 +186,6 @@ class SimpleEditor(ctk.CTk):
                  self._append_output(error, "error_style")
              self._append_output(f"\n[!] SE ENCONTRARON {len(sem_errors)} ERRORES SEMÁNTICOS.", "error_style")
 
-         # Imprimir Tabla de Símbolos
          self._append_output("\n" + "=" * 30 + " TABLA DE SÍMBOLOS " + "=" * 30)
          self._append_output(f"{'IDENTIFICADOR':<20} | {'TIPO':<15} | {'ALCANCE'}")
          self._append_output("-" * 85)
@@ -201,7 +199,6 @@ class SimpleEditor(ctk.CTk):
      except Exception as e:
          self._append_output(f'Error Fatal: {e}', "error_style")
 
-    # --- MÉTODOS DE ARCHIVO (Igual que antes, sin cambios) ---
     def new_file(self):
         if self._maybe_save():
             self.text.delete('0.0', 'end')
@@ -264,7 +261,6 @@ class SimpleEditor(ctk.CTk):
                 else: 
                     self._append_output(f"    {line}")
                     
-            # --- CÓDIGO OPTIMIZADO ---
             opt = optimizer.Optimizer(tac_code)
             optimized_code = opt.optimize()
 
@@ -297,22 +293,18 @@ class SimpleEditor(ctk.CTk):
             generator = codegen.CodeGenerator(optimized_code)
             machine_code, sym_table = generator.generate()
 
-            # --- IMPRESIÓN SECCIÓN 1: CÓDIGO MÁQUINA ---
             self._append_output("=== CÓDIGO MÁQUINA (ENSAMBLADOR) ===")
             for line in machine_code:
                 self._append_output(line)
                 
-            # --- IMPRESIÓN SECCIÓN 2: TABLA DE SÍMBOLOS ---
             self._append_output("\n=== TABLA DE SÍMBOLOS (MEMORIA) ===")
             self._append_output(f"{'Símbolo':<15} | {'Dirección':<10}")
             self._append_output("-" * 30)
             for sym, addr in sym_table.items():
                 self._append_output(f"{sym:<15} | {addr:<10}")
 
-            # --- IMPRESIÓN SECCIÓN 3: ARCHIVO EJECUTABLE ---
             self._append_output("\n" + generator.generate_executable_header())
 
-            # Guardar el binario físicamente (Extra para el entorno real)
             if self._file_path:
                 bin_path = self._file_path.replace('.cpp', '.bin')
                 with open(bin_path, 'w') as f:
@@ -338,9 +330,6 @@ class SimpleEditor(ctk.CTk):
         self._append_output(" INICIANDO COMPILACIÓN COMPLETA ".center(60, "="))
         self._append_output("=" * 60 + "\n")
 
-        # ---------------------------------------------------------
-        # 1. ANÁLISIS LÉXICO
-        # ---------------------------------------------------------
         self._append_output("[1/5] Iniciando Análisis Léxico...")
         try:
             tokens = lexer.tokenize(code)
@@ -356,9 +345,6 @@ class SimpleEditor(ctk.CTk):
             self._append_output(f"  [!] Error crítico en el analizador léxico: {e}", "error_style")
             return
 
-        # ---------------------------------------------------------
-        # 2. ANÁLISIS SINTÁCTICO
-        # ---------------------------------------------------------
         self._append_output("[2/5] Iniciando Análisis Sintáctico...")
         try:
             p = parser.Parser(tokens)
@@ -374,9 +360,6 @@ class SimpleEditor(ctk.CTk):
             self._append_output(f"  [!] Error crítico en el analizador sintáctico: {e}", "error_style")
             return
 
-        # ---------------------------------------------------------
-        # 3. ANÁLISIS SEMÁNTICO
-        # ---------------------------------------------------------
         self._append_output("[3/5] Iniciando Análisis Semántico...")
         try:
             sem_analyzer = Semantic.SemanticAnalyzer(tokens)
@@ -392,9 +375,6 @@ class SimpleEditor(ctk.CTk):
             self._append_output(f"  [!] Error crítico en el analizador semántico: {e}", "error_style")
             return
 
-        # ---------------------------------------------------------
-        # 4. CÓDIGO INTERMEDIO Y OPTIMIZACIÓN
-        # ---------------------------------------------------------
         self._append_output("[4/5] Generando y Optimizando Código Intermedio...")
         try:
             icg_generator = icg.ICG(tokens)
@@ -407,9 +387,6 @@ class SimpleEditor(ctk.CTk):
             self._append_output(f"  [!] Error crítico en la fase de ICG/Optimización: {e}", "error_style")
             return
 
-        # ---------------------------------------------------------
-        # 5. CÓDIGO MÁQUINA (ENSAMBLADOR)
-        # ---------------------------------------------------------
         self._append_output("[5/5] Generando Código Máquina...")
         try:
             generator = codegen.CodeGenerator(optimized_code)
@@ -428,7 +405,6 @@ class SimpleEditor(ctk.CTk):
             self._append_output(f"  [!] Error crítico en la generación de código máquina: {e}", "error_style")
             return
 
-        # --- ÉXITO ---
         self._append_output("\n" + "=" * 60)
         self._append_output("COMPILACIÓN FINALIZADA CON ÉXITO".center(60, "="))
         self._append_output("=" * 60 + "\n")
