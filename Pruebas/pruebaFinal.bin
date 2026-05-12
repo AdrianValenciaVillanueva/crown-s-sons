@@ -1,0 +1,28 @@
+=== ARCHIVO EJECUTABLE GENERADO (programa.bin) ===
+[HEADER] MAGIC: 0x7F454C46 (Formato ELF)
+[HEADER] ENTRY_POINT: 0x1000
+[ENV] PERMISOS: +x (Ejecución permitida)
+[ENV] LIBRERÍAS: std_math.dll cargada
+--------------------------------------------------
+0x1000  AF 2B 00 48 ... (Instrucción Máquina)
+0x1004  AF 2B 00 48 ... (Instrucción Máquina)
+0x1008  AF 2B 00 48 ... (Instrucción Máquina)
+0x100C  AF 2B 00 48 ... (Instrucción Máquina)
+0x1010  AF 2B 00 48 ... (Instrucción Máquina)
+0x1014  AF 2B 00 48 ... (Instrucción Máquina)
+0x1018  AF 2B 00 48 ... (Instrucción Máquina)
+0x101C  AF 2B 00 48 ... (Instrucción Máquina)
+0x1020  AF 2B 00 48 ... (Instrucción Máquina)
+0x1024  AF 2B 00 48 ... (Instrucción Máquina)
+0x1028  AF 2B 00 48 ... (Instrucción Máquina)
+0x102C  AF 2B 00 48 ... (Instrucción Máquina)
+0x1030  AF 2B 00 48 ... (Instrucción Máquina)
+0x1034  AF 2B 00 48 ... (Instrucción Máquina)
+0x1038  AF 2B 00 48 ... (Instrucción Máquina)
+0x103C  AF 2B 00 48 ... (Instrucción Máquina)
+0x1040  AF 2B 00 48 ... (Instrucción Máquina)
+0x1044  AF 2B 00 48 ... (Instrucción Máquina)
+0x1048  AF 2B 00 48 ... (Instrucción Máquina)
+0x104C  AF 2B 00 48 ... (Instrucción Máquina)
+0x1050  AF 2B 00 48 ... (Instrucción Máquina)
+0x1054  AF 2B 00 48 ... (Instrucción Máquina)
