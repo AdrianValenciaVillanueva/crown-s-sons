@@ -55,8 +55,10 @@ class SimpleEditor(ctk.CTk):
         run_menu.add_command(label='Analizar Léxico', command=self.analyze_lexical, accelerator='Ctrl+L')
         run_menu.add_command(label='Analizar Sintaxis', command=self.analyze_syntax, accelerator='Ctrl+T')
         run_menu.add_command(label='Analizar Semántica', command=self.analyze_semantic, accelerator='Ctrl+M')
-        # --- NUEVO BOTÓN ---
         run_menu.add_command(label='Código Intermedio', command=self.generate_icg, accelerator='Ctrl+I')
+        run_menu.add_command(label='Código Máquina', command=self.generate_machine_code, accelerator='Ctrl+G')
+        run_menu.add_separator() # <-- NUEVO: Separador visual
+        run_menu.add_command(label='Compilar Todo (Evaluar 4 Rúbricas)', command=self.compile_all, accelerator='Ctrl+R') # <-- NUEVA OPCIÓN
         menubar.add_cascade(label='Compilar', menu=run_menu)
 
         self.config(menu=menubar)
@@ -68,8 +70,9 @@ class SimpleEditor(ctk.CTk):
         self.bind('<Control-l>', lambda e: self.analyze_lexical())
         self.bind('<Control-t>', lambda e: self.analyze_syntax())
         self.bind('<Control-m>', lambda e: self.analyze_semantic())
-        self.bind('<Control-i>', lambda e: self.generate_icg())  # <-- NUEVO ATAJO
-        self.bind('<Control-g>', lambda e: self.generate_machine_code())  # <-- NUEVO ATAJO
+        self.bind('<Control-i>', lambda e: self.generate_icg())  
+        self.bind('<Control-g>', lambda e: self.generate_machine_code())  
+        self.bind('<Control-r>', lambda e: self.compile_all())  
 
     def _append_output(self, text: str, tags=None):
         """Función auxiliar para escribir en la consola con o sin tags."""
@@ -320,6 +323,115 @@ class SimpleEditor(ctk.CTk):
             self._append_output(f"Error en Generación: {str(e)}")
         
         self.output.configure(state="disabled")
+    def compile_all(self, event=None):
+        """Ejecuta todas las fases del compilador secuencialmente."""
+        self.output.configure(state="normal")
+        self.output.delete('0.0', 'end')
+        self.output.configure(state="disabled")
+        
+        code = self.text.get('0.0', 'end').strip()
+        if not code:
+            self._append_output("[!] No hay código para analizar.", "error_style")
+            return
+
+        self._append_output("=" * 60)
+        self._append_output(" INICIANDO COMPILACIÓN COMPLETA ".center(60, "="))
+        self._append_output("=" * 60 + "\n")
+
+        # ---------------------------------------------------------
+        # 1. ANÁLISIS LÉXICO
+        # ---------------------------------------------------------
+        self._append_output("[1/5] Iniciando Análisis Léxico...")
+        try:
+            tokens = lexer.tokenize(code)
+            lexical_errors = [t for t in tokens if t.type == 'ERROR']
+            if lexical_errors:
+                self._append_output(f"  [!] Falló: Se encontraron {len(lexical_errors)} errores léxicos.", "error_style")
+                for err in lexical_errors:
+                    self._append_output(f"      Línea {err.line}:{err.column} -> {err.error} ('{err.value}')", "error_style")
+                self._append_output("\n[X] Compilación abortada.", "error_style")
+                return
+            self._append_output(f"  [OK] Análisis Léxico exitoso ({len(tokens)} tokens).\n")
+        except Exception as e:
+            self._append_output(f"  [!] Error crítico en el analizador léxico: {e}", "error_style")
+            return
+
+        # ---------------------------------------------------------
+        # 2. ANÁLISIS SINTÁCTICO
+        # ---------------------------------------------------------
+        self._append_output("[2/5] Iniciando Análisis Sintáctico...")
+        try:
+            p = parser.Parser(tokens)
+            syntax_errors = p.parse()
+            if syntax_errors:
+                self._append_output(f"  [!] Falló: Se encontraron {len(syntax_errors)} errores sintácticos.", "error_style")
+                for err in syntax_errors:
+                    self._append_output(f"      {err}", "error_style")
+                self._append_output("\n[X] Compilación abortada.", "error_style")
+                return
+            self._append_output("  [OK] Estructura Sintáctica válida.\n")
+        except Exception as e:
+            self._append_output(f"  [!] Error crítico en el analizador sintáctico: {e}", "error_style")
+            return
+
+        # ---------------------------------------------------------
+        # 3. ANÁLISIS SEMÁNTICO
+        # ---------------------------------------------------------
+        self._append_output("[3/5] Iniciando Análisis Semántico...")
+        try:
+            sem_analyzer = Semantic.SemanticAnalyzer(tokens)
+            sem_analyzer.analyze()
+            if sem_analyzer.errors:
+                self._append_output(f"  [!] Falló: Se encontraron {len(sem_analyzer.errors)} errores semánticos.", "error_style")
+                for err in sem_analyzer.errors:
+                    self._append_output(f"      {err}", "error_style")
+                self._append_output("\n[X] Compilación abortada.", "error_style")
+                return
+            self._append_output("  [OK] Reglas semánticas y tipos de datos válidos.\n")
+        except Exception as e:
+            self._append_output(f"  [!] Error crítico en el analizador semántico: {e}", "error_style")
+            return
+
+        # ---------------------------------------------------------
+        # 4. CÓDIGO INTERMEDIO Y OPTIMIZACIÓN
+        # ---------------------------------------------------------
+        self._append_output("[4/5] Generando y Optimizando Código Intermedio...")
+        try:
+            icg_generator = icg.ICG(tokens)
+            tac_code = icg_generator.generate()
+            
+            opt = optimizer.Optimizer(tac_code)
+            optimized_code = opt.optimize()
+            self._append_output(f"  [OK] Código de 3 direcciones generado y optimizado.\n")
+        except Exception as e:
+            self._append_output(f"  [!] Error crítico en la fase de ICG/Optimización: {e}", "error_style")
+            return
+
+        # ---------------------------------------------------------
+        # 5. CÓDIGO MÁQUINA (ENSAMBLADOR)
+        # ---------------------------------------------------------
+        self._append_output("[5/5] Generando Código Máquina...")
+        try:
+            generator = codegen.CodeGenerator(optimized_code)
+            machine_code, sym_table = generator.generate()
+            
+            self._append_output("  [OK] Ensamblador generado correctamente.")
+            self._append_output("  --- MUESTRA DEL BINARIO ---")
+            for line in machine_code[:5]: # Muestra las primeras 5 instrucciones
+                self._append_output("      " + line)
+            if len(machine_code) > 5:
+                self._append_output(f"      ... (+ {len(machine_code)-5} instrucciones)")
+            
+            self._append_output("\n" + generator.generate_executable_header())
+            
+        except Exception as e:
+            self._append_output(f"  [!] Error crítico en la generación de código máquina: {e}", "error_style")
+            return
+
+        # --- ÉXITO ---
+        self._append_output("\n" + "=" * 60)
+        self._append_output("COMPILACIÓN FINALIZADA CON ÉXITO".center(60, "="))
+        self._append_output("=" * 60 + "\n")
 
 def main():
     app = SimpleEditor()
