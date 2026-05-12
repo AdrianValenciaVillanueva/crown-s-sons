@@ -256,7 +256,7 @@ class ICG:
             elif self.peek() and self.peek().value == "=":
                 self.consume() # '='
                 
-                # Creación de objetos (new Persona())
+                # Creación de objetos
                 if self.peek() and self.peek().value == "new":
                     self.consume() # 'new'
                     class_name = self.consume().value
